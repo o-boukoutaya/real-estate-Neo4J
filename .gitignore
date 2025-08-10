@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+ENV/
+.Python
+.pytest_cache/
+
+# Virtualenv in repo
+backenv/
+
+# Logs and runtime
+*.log
+*.out
+*.err
+*.pid
+
+# Local data
+/data/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node / frontend
+RAG-UI/node_modules/
+RAG-UI/dist/
+RAG-UI/.vite/
+
+# Environment
+.env
+.env.*

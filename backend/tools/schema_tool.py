@@ -1,0 +1,3 @@
+# Ce fichier doit contenir le Tool pour la génération ou inspection de schéma.
+
+# ...existing code...

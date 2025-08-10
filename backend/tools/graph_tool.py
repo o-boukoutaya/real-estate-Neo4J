@@ -1,0 +1,3 @@
+# Ce fichier doit contenir le Tool pour la navigation dans le knowledge graph.
+
+# ...existing code...
