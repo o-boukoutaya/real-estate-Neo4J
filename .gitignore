@@ -16,6 +16,7 @@ backenv/
 *.out
 *.err
 *.pid
+*.zip
 
 # Local data
 /data/
