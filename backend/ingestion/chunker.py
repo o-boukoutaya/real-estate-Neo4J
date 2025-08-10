@@ -2,6 +2,10 @@ import re
 from typing import List
 import os
 from datetime import datetime
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class Chunker:
     def __init__(self, chunk_size=1000, chunk_overlap=100, extracted_dir=None):
@@ -22,20 +26,23 @@ class Chunker:
         in_path = os.path.normpath(os.path.join(serie_path, fname + '.' + fext))
 
         # Log le chemin construit
-        print(f"Chemin construit : {in_path}")
+        logger.info("Chemin construit : %s", in_path)
 
         # Vérifier l'existence et les permissions du fichier
         abs_path = os.path.abspath(in_path)
-        print(f"Chemin absolu : {abs_path}")
+        logger.info("Chemin absolu : %s", abs_path)
         if not os.path.exists(abs_path):
-            print(f"Le fichier n'existe pas : {abs_path}")
+            logger.error("Le fichier n'existe pas : %s", abs_path)
             raise FileNotFoundError(f"Le fichier spécifié n'existe pas : {abs_path}")
         if not os.access(abs_path, os.R_OK):
-            print(f"Le fichier n'est pas accessible en lecture : {abs_path}")
+            logger.error("Le fichier n'est pas accessible en lecture : %s", abs_path)
             raise PermissionError(f"Le fichier spécifié n'est pas accessible en lecture : {abs_path}")
-
-        with open(abs_path, 'r', encoding='utf-8') as f:
-            text = f.read()
+        try:
+            with open(abs_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+        except Exception as e:
+            logger.error("Erreur lors de la lecture du fichier %s: %s", abs_path, e)
+            raise
         return text
 
     def character_split(self, text: str) -> List[str]:

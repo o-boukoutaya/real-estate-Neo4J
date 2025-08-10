@@ -1,5 +1,9 @@
 """Factory + validation des embedders."""
 from .embedder_base import HuggingFaceEmbedder, OpenAIEmbedder, GeminiEmbedder
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class EmbeddingManager:
     _registry = {
@@ -19,7 +23,11 @@ class EmbeddingManager:
     # ------------------------------------------------------------------
     def get_embedder(self):
         if self._embedder is None:
-            self._embedder = self._registry[self.provider](**self.kwargs)
+            try:
+                self._embedder = self._registry[self.provider](**self.kwargs)
+            except Exception as e:
+                logger.error('Unable to initialize embedder %s: %s', self.provider, e)
+                raise
         return self._embedder
 
     # ------------------------------------------------------------------
@@ -40,14 +48,20 @@ class EmbeddingManager:
             vec = self.get_embedder().dummy_vector()   # ← nouvelle méthode
             assert isinstance(vec, list) and all(isinstance(x, float) for x in vec)
         except Exception as e:
+            logger.error('Embedding validation failed: %s', e)
             raise RuntimeError("Embedding retourné invalide") from e
         return True
 
 
     # API pratique ------------------------------------------------------
     def embed_texts(self, texts):
-        return self.get_embedder().batch_embed(texts)
+        try:
+            return self.get_embedder().batch_embed(texts)
+        except Exception as e:
+            logger.error('Embedding texts failed: %s', e)
+            raise
 
     # ------------------------------------------------------------------
     def __str__(self):
         return f"EmbeddingManager(provider={self.provider})"
+

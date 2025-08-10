@@ -2,6 +2,10 @@
 """Interface + implémentations d’embedders."""
 from abc import ABC, abstractmethod
 from typing import List
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class EmbedderInterface:
     @property
@@ -38,11 +42,19 @@ class HuggingFaceEmbedder(EmbedderInterface):
         return self.model.get_sentence_embedding_dimension()
 
     def embed(self, text: str) -> List[float]:
-        return self.model.encode(text, normalize_embeddings=self.normalize).tolist()
+        try:
+            return self.model.encode(text, normalize_embeddings=self.normalize).tolist()
+        except Exception as e:
+            logger.error("HF embedding failed: %s", e)
+            raise
 
     def batch_embed(self, texts: List[str]) -> List[List[float]]:
-        vecs = self.model.encode(texts, batch_size=self.batch_size, normalize_embeddings=self.normalize)
-        return [v.tolist() for v in vecs]
+        try:
+            vecs = self.model.encode(texts, batch_size=self.batch_size, normalize_embeddings=self.normalize)
+            return [v.tolist() for v in vecs]
+        except Exception as e:
+            logger.error("HF batch embedding failed: %s", e)
+            raise
 
 # ----------------------------- OpenAI -----------------------------
 # class OpenAIEmbedder(EmbedderInterface):
@@ -88,11 +100,19 @@ class OpenAIEmbedder(EmbedderInterface):
         return 1536
 
     def embed(self, text: str) -> List[float]:
-        return self.batch_embed([text])[0]
+        try:
+            return self.batch_embed([text])[0]
+        except Exception as e:
+            logger.error("OpenAI embedding failed: %s", e)
+            raise
 
     def batch_embed(self, texts: List[str]) -> List[List[float]]:
-        resp = self.client.embeddings.create(input=texts, model=self.model)
-        return [d.embedding for d in resp.data]
+        try:
+            resp = self.client.embeddings.create(input=texts, model=self.model)
+            return [d.embedding for d in resp.data]
+        except Exception as e:
+            logger.error("OpenAI batch embedding failed: %s", e)
+            raise
 
     def dummy_vector(self) -> List[float]:
         # dimension fixe pour ada-002 = 1536
@@ -114,8 +134,17 @@ class GeminiEmbedder(EmbedderInterface):
         return 4096
 
     def embed(self, text: str) -> List[float]:
-        return self.batch_embed([text])[0]
+        try:
+            return self.batch_embed([text])[0]
+        except Exception as e:
+            logger.error("Gemini embedding failed: %s", e)
+            raise
 
     def batch_embed(self, texts: List[str]) -> List[List[float]]:
-        resp = self.client.embeddings.generate(model=self.model, texts=texts)
-        return [e.values for e in resp.embeddings]
+        try:
+            resp = self.client.embeddings.generate(model=self.model, texts=texts)
+            return [e.values for e in resp.embeddings]
+        except Exception as e:
+            logger.error("Gemini batch embedding failed: %s", e)
+            raise
+

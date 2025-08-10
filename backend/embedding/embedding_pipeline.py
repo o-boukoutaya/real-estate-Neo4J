@@ -1,9 +1,11 @@
 """Pipeline : ingestion de chunks (en mémoire **ou** depuis un dossier) → embeddings → Neo4j vector store.
-    La route FastAPI ne fait qu'orchestrer ; toute la logique se trouve ici.
-"""
+    La route FastAPI ne fait qu'orchestrer ; toute la logique se trouve ici."""
 from typing import List, Dict, Any
 from pathlib import Path
 from datetime import datetime
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 from .embedding_manager import EmbeddingManager
 from .vector_store import Neo4jVectorManager
@@ -18,39 +20,45 @@ class EmbeddingPipeline:
     # ------------------------------------------------------------------
     def _load_series_texts(self, series_version: str) -> List[str]:
         """Retourne la liste des textes contenus dans *data/chunks/chunks_<series_version>/*.txt*"""
-        d = self.data_root / f"chunks_{series_version}"
-        if not d.exists():
-            raise FileNotFoundError(f"Répertoire introuvable : {d}")
-        files = sorted(d.glob("*.txt"))
-        if not files:
-            raise RuntimeError("Aucun chunk trouvé dans le dossier : " + d.as_posix())
-        return [p.read_text(encoding="utf-8") for p in files]
+        try:
+            d = self.data_root / f"chunks_{series_version}"
+            if not d.exists():
+                raise FileNotFoundError(f"Répertoire introuvable : {d}")
+            files = sorted(d.glob("*.txt"))
+            if not files:
+                raise RuntimeError("Aucun chunk trouvé dans le dossier : " + d.as_posix())
+            return [p.read_text(encoding="utf-8") for p in files]
+        except Exception as e:
+            logger.error("Erreur lors du chargement de la série %s: %s", series_version, e)
+            raise
 
     # ------------------------------------------------------------------
     def run(self, chunks: List[Dict], *, version: str | None = None):
-        """Ingère une liste de dictionnaires : {"text": …}."""
-        texts = [c["text"] for c in chunks]
-        embeddings = self.embedder.embed_texts(texts)
-        if not self.vector_store.check_index_exists():
-            dim = len(embeddings[0])
-            self.vector_store.create_index(dim=dim)
-        self.vector_store.save(texts=texts, embeddings=embeddings, version=version)
-        return len(chunks)
+        """Ingère une liste de dictionnaires : {"text": …}."""
+        try:
+            texts = [c["text"] for c in chunks]
+            embeddings = self.embedder.embed_texts(texts)
+            if not self.vector_store.check_index_exists():
+                dim = len(embeddings[0])
+                self.vector_store.create_index(dim=dim)
+            self.vector_store.save(texts=texts, embeddings=embeddings, version=version)
+            return len(chunks)
+        except Exception as e:
+            logger.error("Erreur dans la pipeline d'embedding: %s", e)
+            raise
 
     def get_chunks_text(self, series_version: str) -> List[str]:
         """Retourne les textes des chunks d’une série."""
-        texts = self._load_series_texts(series_version)
+        try:
+            texts = self._load_series_texts(series_version)
+        except Exception as e:
+            logger.error("Erreur lors de la récupération des chunks pour %s: %s", series_version, e)
+            raise
         if not texts:
             return {"status": "error", "message": f"Série vide : {series_version}"}
-        return {"status":"ok", "chunks": texts} 
-    # ------------------------------------------------------------------
-    # def run_from_series(self, series_version: str, *, version: str | None = None):
-    #     """Charge automatiquement tous les chunks d’une série puis appelle *run()*."""
-    #     texts = self._load_series_texts(series_version)
-    #     dicts = [{"text": t} for t in texts]
-    #     return self.run(dicts, version=version or series_version)
-    # ------------------------------------------------------------------
+        return {"status":"ok", "chunks": texts}
 
+    # ------------------------------------------------------------------
     def run_from_series(self, texts: List[str], series_version: str, *, similarity: str = "cosine") -> int:
         """
         Ingeste une série (texte → chunks → embeddings → Neo4j).
@@ -69,34 +77,34 @@ class EmbeddingPipeline:
         int
             Nombre de chunks réellement indexés.
         """
+        try:
+            # 1. Préparer les données ------------------------------------------------
+            embeddings: List[List[float]] = self.embedder.embed_texts(texts)
+            dim: int = len(embeddings[0])
 
-        # 1. Préparer les données ------------------------------------------------
-        embeddings: List[List[float]] = self.embedder.embed_texts(texts)
-        dim: int = len(embeddings[0])
-        
-        # 2. Créer l’index vectoriel (une seule fois) ----------------------------
-        if not self.vector_store.check_index_exists():
-            self.vector_store.create_index(dim=dim, similarity=similarity)
-        
-        # 3. Transformer en lignes batch ----------------------------------------
-        stamp = datetime.now().isoformat(timespec="seconds")
-        rows: List[Dict[str, Any]] = [
-            {
-                "cid": f"{series_version}-{i:06d}",
-                "text": txt,
-                "vec":  vec,
-                "series": series_version,
-                "ingest_ts": stamp,
-            }
-            for i, (txt, vec) in enumerate(zip(texts, embeddings), 1)
-        ]
+            # 2. Créer l’index vectoriel (une seule fois) ----------------------------
+            if not self.vector_store.check_index_exists():
+                self.vector_store.create_index(dim=dim, similarity=similarity)
 
-        # 4. Insérer / mettre à jour les nœuds Chunk + vecteur -------------------
-        cypher_chunks = """
+            # 3. Transformer en lignes batch ----------------------------------------
+            stamp = datetime.now().isoformat(timespec="seconds")
+            rows: List[Dict[str, Any]] = [
+                {
+                    "cid": f"{series_version}-{i:06d}",
+                    "text": txt,
+                    "vec":  vec,
+                    "series": series_version,
+                    "ingest_ts": stamp,
+                }
+                for i, (txt, vec) in enumerate(zip(texts, embeddings), 1)
+            ]
+
+            # 4. Insérer / mettre à jour les nœuds Chunk + vecteur -------------------
+            cypher_chunks = """
             UNWIND $rows AS row
             MERGE (c:Chunk {id: row.cid})
             ON CREATE SET
-                    c.text        = row.text,   
+                    c.text        = row.text,
                     c.embedding   = row.vec,
                     c.series      = row.series,
                     c.ingest_ts   = row.ingest_ts
@@ -105,22 +113,25 @@ class EmbeddingPipeline:
                     c.embedding   = row.vec,
                     c.series      = row.series
             """
-        
-        with self.vector_store.driver.session(database=self.vector_store.db) as s:
-            s.run(cypher_chunks, rows=rows)
-            
-            # 5. Relations NEXT_CHUNK (séquencement) ---------------------------
-            rels = [
-                {"from": rows[i]["cid"], "to": rows[i + 1]["cid"]}
-                for i in range(len(rows) - 1)
-            ]
-            if rels:
-                cypher_rels = """
-                UNWIND $rels AS rel
-                MATCH (c1:Chunk {id: rel.from})
-                MATCH (c2:Chunk {id: rel.to})
-                MERGE (c1)-[:NEXT_CHUNK]->(c2)
-                """
-                s.run(cypher_rels, rels=rels)
 
-        return len(rows)
+            with self.vector_store.driver.session(database=self.vector_store.db) as s:
+                s.run(cypher_chunks, rows=rows)
+
+                # 5. Relations NEXT_CHUNK (séquencement) ---------------------------
+                rels = [
+                    {"from": rows[i]["cid"], "to": rows[i + 1]["cid"]}
+                    for i in range(len(rows) - 1)
+                ]
+                if rels:
+                    cypher_rels = """
+                    UNWIND $rels AS rel
+                    MATCH (c1:Chunk {id: rel.from})
+                    MATCH (c2:Chunk {id: rel.to})
+                    MERGE (c1)-[:NEXT_CHUNK]->(c2)
+                    """
+                    s.run(cypher_rels, rels=rels)
+
+            return len(rows)
+        except Exception as e:
+            logger.error("Erreur lors de l'ingestion de la série %s: %s", series_version, e)
+            raise
