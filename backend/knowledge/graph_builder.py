@@ -4,6 +4,10 @@
 from __future__ import annotations
 from typing import List, ClassVar, Pattern
 import json, os, re
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 from langchain.prompts import PromptTemplate
 from langchain.schema import BaseOutputParser
 
@@ -186,10 +190,15 @@ class GraphBuilder:
 
     # ------------------------------------------------------------------
     def extract_relations(self, text: str) -> List[_Triplet]:
-        print(f"Texte envoyé au LLM : {text}")
-        prompt = self._PROMPT.format(passage=text)
-        print(f"Prompt généré : {prompt}")
-        response = self.llm.invoke(prompt) if callable(getattr(self.llm, "invoke", None)) else self.llm(prompt)
-        txt = response.content if hasattr(response, "content") else str(response)
-        print(f"Réponse du LLM : {txt}")
-        return self.parser.parse(txt)
+        try:
+            logger.info("Texte envoyé au LLM : %s", text)
+            prompt = self._PROMPT.format(passage=text)
+            logger.info("Prompt généré : %s", prompt)
+            response = self.llm.invoke(prompt) if callable(getattr(self.llm, "invoke", None)) else self.llm(prompt)
+            txt = response.content if hasattr(response, "content") else str(response)
+            logger.info("Réponse du LLM : %s", txt)
+            return self.parser.parse(txt)
+        except Exception as e:
+            logger.error("Erreur lors de l'extraction des relations: %s", e)
+            raise
+

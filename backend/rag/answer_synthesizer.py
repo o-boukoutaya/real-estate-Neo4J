@@ -1,6 +1,10 @@
 # backend/rag/answer_synthesizer.py
 from langchain_core.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 _QA_PROMPT = PromptTemplate.from_template(
     """
@@ -25,6 +29,12 @@ class AnswerSynthesizer:
 
     # ------------------------------------------------------------------
     def synthesize(self, context: str, question: str) -> str:
-        p = self.prompt.format(context=context, question=question)
-        ans = self.llm.invoke(p)
-        return ans.content if hasattr(ans, "content") else str(ans)
+        try:
+            p = self.prompt.format(context=context, question=question)
+            ans = self.llm.invoke(p)
+            return ans.content if hasattr(ans, "content") else str(ans)
+        except Exception as e:
+            logger.error("Answer synthesis failed: %s", e)
+            return ""
+
+

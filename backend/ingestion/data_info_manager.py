@@ -1,6 +1,10 @@
 import os
 import datetime
 from typing import List, Dict, Optional
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class DataInfoManager:
     def __init__(self, prov_dir=None, extracted_dir=None):
@@ -68,7 +72,7 @@ class DataInfoManager:
             driver.close()
             return count > 0
         except Exception as e:
-            print(f"Neo4j check failed: {e}")
+            logger.error("Neo4j check failed: %s", e)
             return None
 
     def summarize_versions_tree(self) -> dict:

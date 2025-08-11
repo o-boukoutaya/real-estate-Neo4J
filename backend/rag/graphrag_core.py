@@ -6,6 +6,10 @@ from rag.retriever import Retriever
 from rag.query_generator import QueryGenerator
 from rag.answer_synthesizer import AnswerSynthesizer
 from rag.context_manager import ContextManager
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 
 class GraphRAG:
@@ -24,16 +28,20 @@ class GraphRAG:
 
     # ------------------------------------------------------------------
     def query(self, question: str, *, k: int = 8) -> dict:
-        hits = self.retriever.retrieve(question, k=k)
-        context = self.ctx_mgr.merge(**hits)
+        try:
+            hits = self.retriever.retrieve(question, k=k)
+            context = self.ctx_mgr.merge(**hits)
 
-        # (option) : générer + exécuter une requête Cypher supplémentaire
-        ents = self.retriever._extract_entities([question])
-        cypher = self.qgen.generate(question, ents)
+            ents = self.retriever._extract_entities([question])
+            cypher = self.qgen.generate(question, ents)
 
-        answer = self.synth.synthesize(context=context, question=question)
-        return {
-            "answer": answer,
-            "context": hits,
-            "cypher": cypher,
-        }
+            answer = self.synth.synthesize(context=context, question=question)
+            return {
+                "answer": answer,
+                "context": hits,
+                "cypher": cypher,
+            }
+        except Exception as e:
+            logger.error("GraphRAG query failed: %s", e)
+            return {"error": str(e)}
+

@@ -1,3 +1,8 @@
+
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 @dataclass
 class EmbeddingConfig:
     provider: Literal["openai","gemini","huggingface"]

@@ -6,6 +6,10 @@ import fitz  # PyMuPDF
 import shutil
 from datetime import datetime
 from typing import Union, Callable, List
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class DocumentLoader:
     def __init__(self, splitter: Union[str, Callable] = "character", chunk_size: int = 1000, chunk_overlap: int = 100, separators: List[str] = None):
@@ -65,7 +69,7 @@ class DocumentLoader:
                     'date': datetime.fromtimestamp(stat.st_mtime).isoformat()
                 })
             except Exception as e:
-                errors.append({'file': filename, 'error': str(e)})
+                logger.error("Erreur lors de l'enregistrement de %s: %s", filename, e); errors.append({'file': filename, 'error': str(e)})
         # Save meta.json if tags/description provided
         if tags or description:
             meta = {'tags': tags, 'description': description, 'created': datetime.now().isoformat()}

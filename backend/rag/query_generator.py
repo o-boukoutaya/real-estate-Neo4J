@@ -3,6 +3,10 @@ from langchain_core.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from dotenv import load_dotenv
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 load_dotenv()
 
@@ -33,6 +37,12 @@ class QueryGenerator:
 
     # ------------------------------------------------------------------
     def generate(self, question: str, entities: list[str]) -> str:
-        p = self.prompt.format(question=question, entities=", ".join(entities))
-        ans = self.llm.invoke(p)
-        return ans.content.strip() if hasattr(ans, "content") else str(ans).strip()
+        try:
+            p = self.prompt.format(question=question, entities=", ".join(entities))
+            ans = self.llm.invoke(p)
+            return ans.content.strip() if hasattr(ans, "content") else str(ans).strip()
+        except Exception as e:
+            logger.error("Cypher generation failed: %s", e)
+            return ""
+
+
