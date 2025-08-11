@@ -1,6 +1,10 @@
+from dataclasses import dataclass
+from typing import Literal
+
+
 @dataclass
 class EmbeddingConfig:
-    provider: Literal["openai","gemini","huggingface"]
+    provider: Literal["openai", "gemini", "huggingface"]
     model: str | None = None
     api_key: str | None = None
     api_base: str | None = None   # Azure

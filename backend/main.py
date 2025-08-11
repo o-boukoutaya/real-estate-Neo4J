@@ -17,18 +17,16 @@ from settings import SERVER_OPTIONS
 load_dotenv()
 
 # ──────────────────────────────────────────────────────────────
-# Lifespan FastAPI : gère start-/shutdown de MCP
+# Lifespan FastAPI : (for stdio/SSE background if needed) — not used when mounting SSE app
 # ──────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     transport = SERVER_OPTIONS.get("transport", "http")
     # START-UP
     if transport == "stdio":
-        # Lancer run_stdio_async en tâche de fond
+        # Optional: run stdio transport in background (not used when mounting SSE app)
         app.state.mcp_task = asyncio.create_task(mcp_app.run_stdio_async())
-    if transport == "sse":
-        # Lancer run_stdio_async en tâche de fond
-        app.state.mcp_task = asyncio.create_task(mcp_app.run_sse_async())
+    # For SSE, we'll mount the Starlette sub-app instead of spawning a separate server.
 
     yield  # —— l’application tourne ——
 
@@ -42,15 +40,13 @@ async def lifespan(app: FastAPI):
 # FastAPI app racine
 # ──────────────────────────────────────────────────────────────
 
-# Montage des sous-applications
-sub_app = mcp_app.http_app()
-# sub_app = mcp_app.streamable_http_app()
+# Montage des sous-applications (FastMCP SSE ASGI app)
+sub_app = mcp_app.sse_app()
 
 
 app = FastAPI(
     title="GraphRAG Admin + MCP",
     lifespan=sub_app.router.lifespan_context,
-    # lifespan=lifespan
 )
 
 # Health-check
@@ -58,7 +54,7 @@ app = FastAPI(
 async def healthz():
     return JSONResponse({"status": "ok"})
 
-app.mount("/mcp-server", sub_app, "mcp")     # routes MCP (SSE/JSON)
+app.mount("/mcp-server", sub_app, "mcp")     # routes MCP (SSE under /mcp-server)
 
 # app.include_router(api_router, prefix="/api")         # routes API
 app.include_router(api_router) 
@@ -76,20 +72,14 @@ async def generic_exception_handler(request: Request, exc: Exception):
 # ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    # uvicorn.run(
-    #     "main:app",
-    #     host=SERVER_OPTIONS["host"],
-    #     port=SERVER_OPTIONS["port"],
-    #     log_level="info",
-    #     reload=bool(os.getenv("DEV_RELOAD", False)),
-    # )
     uvicorn.run("main:app", host=SERVER_OPTIONS["host"], port=SERVER_OPTIONS["port"], reload=True)
 
 
 # Points clés
 # MCP dans FastAPI Accessible sur le port 8050
-# → POST http://127.0.0.1:8050/mcp-server/run
-# → GET http://127.0.0.1:8050/mcp-server/events
+# With fastmcp.sse_app():
+# → GET  http://127.0.0.1:8050/mcp-server/sse
+# → POST http://127.0.0.1:8050/mcp-server/messages/
 
 # second serveur SSE Dans ce serveur dédié, le sous-app est à la racine
 # → POST http://127.0.0.1:8443/run

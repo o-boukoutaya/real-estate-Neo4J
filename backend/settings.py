@@ -11,9 +11,17 @@ NEO4J_CFG = {
     "embed_prop": os.getenv("NEO4J_EMBED_PROP", "embedding"),
 }
 
+_embedder_params_raw = os.getenv("EMBEDDER_PARAMS", "{}")
+try:
+    _embedder_params = json.loads(_embedder_params_raw)
+except json.JSONDecodeError:
+    # Fallback to empty params when the env var is not valid JSON
+    _embedder_params = {}
+
 EMBED_CFG = {
     "provider": os.getenv("EMBEDDER_PROVIDER", "huggingface"),
-    "params":   json.loads(os.getenv("EMBEDDER_PARAMS", "{}"))
+    "params": _embedder_params,
+    #"params":   json.loads(os.getenv("EMBEDDER_PARAMS", "{}"))
 }
 
 SERVER_OPTIONS = {
