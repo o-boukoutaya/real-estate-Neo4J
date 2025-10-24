@@ -13,6 +13,11 @@ from fastapi.middleware.wsgi import WSGIMiddleware
 from app.api import api_router
 from tools.graph_rag_tool import mcp as mcp_app
 from settings import SERVER_OPTIONS
+from app.core.logging import setup_logging
+setup_logging("INFO")
+from app.api.middleware import RequestContextMiddleware
+
+
 
 load_dotenv()
 
@@ -21,6 +26,7 @@ load_dotenv()
 # ──────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    app.add_middleware(RequestContextMiddleware)
     transport = SERVER_OPTIONS.get("transport", "http")
     # START-UP
     if transport == "stdio":

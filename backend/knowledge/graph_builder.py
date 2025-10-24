@@ -6,6 +6,9 @@ from typing import List, ClassVar, Pattern
 import json, os, re
 from langchain.prompts import PromptTemplate
 from langchain.schema import BaseOutputParser
+from app.core.logging import get_logger, log_step
+# log = get_logger("kg.graph_builder")
+logger = get_logger(__name__)  # optionnel
 
 # -------------------------------------------------------------------
 class _Triplet:
@@ -185,6 +188,7 @@ class GraphBuilder:
         self.parser = _JSONTripletParser()
 
     # ------------------------------------------------------------------
+    @log_step("kg_extract_relations")
     def extract_relations(self, text: str) -> List[_Triplet]:
         print(f"Texte envoyé au LLM : {text}")
         prompt = self._PROMPT.format(passage=text)

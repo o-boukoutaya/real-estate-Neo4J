@@ -6,7 +6,8 @@ from rag.retriever import Retriever
 from rag.query_generator import QueryGenerator
 from rag.answer_synthesizer import AnswerSynthesizer
 from rag.context_manager import ContextManager
-
+from app.core.logging import log_step, get_logger
+logger = get_logger(__name__)  # optionnel
 
 class GraphRAG:
     def __init__(self, neo4j_cfg: dict, embed_cfg: dict | None = None, llm_cfg: dict | None = None):
@@ -23,6 +24,7 @@ class GraphRAG:
         self.ctx_mgr = ContextManager()
 
     # ------------------------------------------------------------------
+    @log_step("rag_query")
     def query(self, question: str, *, k: int = 8) -> dict:
         hits = self.retriever.retrieve(question, k=k)
         context = self.ctx_mgr.merge(**hits)

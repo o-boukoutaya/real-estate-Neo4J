@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import os, json
 from pathlib import Path
+from app.core.logging import log_step
 
 from .schemas import (         # met tes Pydantic ici si besoin
     SeriesIndexRequest, KGRequest
@@ -32,8 +33,9 @@ def _load_default():
 async def create_index(req: SeriesIndexRequest):
     try:
         cfg = _load_default() if req.embedder is None else {"provider": req.embedder, "params": {}}
-        # mgr = EmbeddingManager(cfg["provider"], **cfg.get("params", {}))
-        mgr = EmbeddingManager(EmbeddingConfig(**cfg))
+        mgr = EmbeddingManager(cfg["provider"], **cfg.get("params", {}))
+        # mgr = EmbeddingManager(EmbeddingConfig(**cfg))
+
         store = Neo4jVectorManager(**NEO4J_CFG)
         pipeline = EmbeddingPipeline(embedder=mgr, vector_store=store)
         results = pipeline.get_chunks_text(req.series)
@@ -75,10 +77,16 @@ async def create_index(req: SeriesIndexRequest):
     #     raise HTTPException(status_code=500, detail=str(e))
 
 # -------------------------------------------------------------------
-@router.post("/build-kg") # (POST) http://localhost:8050/api/v1/idx-kg/build-kg
+@router.post("/build-kg")
+@log_step("route_build_kg")
 async def build_kg(body: KGRequest):
-    store = Neo4jVectorManager(**NEO4J_CFG)
-    llm_chain = GraphBuilder()  # config LLM selon ton choix (OpenAI, Gemini…)
-    kg = KGBuilder(driver=store.driver, database=store.db, llm=llm_chain, schema_manager=GraphSchemaManager())
-    results = kg.build_from_series(body.series)
-    return results
+    try:
+        llm_chain = GraphBuilder()              # prendra GOOGLE_API_KEY depuis l'env
+        kg = KGBuilder(llm=llm_chain)
+        results = kg.build_from_series(body.series)
+        return results
+    except ValueError as e:
+        # Parse LLM/JSON échoué → 502 Bad Gateway
+        raise HTTPException(status_code=502, detail=f"LLM parse failed: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

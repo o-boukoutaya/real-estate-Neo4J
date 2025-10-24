@@ -1,11 +1,11 @@
-# Ce fichier doit contenir la logique de fusion Retriever (KG + Vector)
-
 # backend/rag/retriever.py
 from __future__ import annotations
 from typing import List, Dict
 from neo4j import Driver
 from embedding.embedding_manager import EmbeddingManager
 from embedding.vector_store import Neo4jVectorManager
+from app.core.logging import log_step, get_logger
+logger = get_logger(__name__)  # optionnel
 
 
 class Retriever:
@@ -24,6 +24,7 @@ class Retriever:
         self.driver = kg_driver
 
     # ---------- Vector --------------------------------------------------
+    @log_step("vector_search")
     def _vector_hits(self, question: str, k: int = 8) -> List[Dict]:
         vec = self.embedder.embed_texts([question])[0]
         return self.vstore.search_similar(vec, k=k)
@@ -52,6 +53,7 @@ class Retriever:
             return [dict(r) for r in s.run(cypher, ents=entities)]
 
     # ---------- Public API ---------------------------------------------
+    @log_step("retrieve")
     def retrieve(self, question: str, *, k: int = 8) -> Dict:
         v_hits = self._vector_hits(question, k=k)
         ents = self._extract_entities([h["text"] for h in v_hits])

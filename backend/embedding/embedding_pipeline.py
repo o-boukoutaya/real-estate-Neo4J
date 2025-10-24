@@ -8,6 +8,9 @@ from datetime import datetime
 from .embedding_manager import EmbeddingManager
 from .vector_store import Neo4jVectorManager
 
+from app.core.logging import log_step, get_logger
+logger = get_logger(__name__)  # optionnel
+
 class EmbeddingPipeline:
     def __init__(self, *, embedder: EmbeddingManager, vector_store: Neo4jVectorManager,
                  data_root: Path = Path("data/chunks")):
@@ -50,7 +53,7 @@ class EmbeddingPipeline:
     #     dicts = [{"text": t} for t in texts]
     #     return self.run(dicts, version=version or series_version)
     # ------------------------------------------------------------------
-
+    @log_step("embedding_pipeline")
     def run_from_series(self, texts: List[str], series_version: str, *, similarity: str = "cosine") -> int:
         """
         Ingeste une série (texte → chunks → embeddings → Neo4j).

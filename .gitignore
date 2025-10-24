@@ -20,6 +20,9 @@ backenv/
 
 # Local data
 /data/
+backend/data/chunks
+backend/data/extracted
+backend/data/provfiles
 
 # OS/editor
 .DS_Store

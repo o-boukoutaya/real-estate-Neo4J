@@ -5,12 +5,14 @@
 
 import os
 from ingestion.document_loader import DocumentLoader
+from ingestion.docs_manager import DocsManager
 from ingestion.extractor import Extractor
 from ingestion.chunker import Chunker
 
 class DataImporter:
     def __init__(self):
         self.loader = DocumentLoader()
+        self.docsManager = DocsManager()
         self.extractor = Extractor()
         self.chunker = Chunker()
 
@@ -22,7 +24,8 @@ class DataImporter:
         - Chunking
         """
         # Étape 1 : sauvegarde des fichiers uploadés
-        serie_path = self.loader.save_uploaded_files(files)
+        # serie_path = self.loader.save_uploaded_files(files)
+        serie_path = self.docsManager.save_uploaded_files(files)
         serie_version = os.path.basename(serie_path)
 
         # Étape 2 : extraction du texte

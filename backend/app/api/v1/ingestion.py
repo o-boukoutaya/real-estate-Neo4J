@@ -10,6 +10,7 @@ from .schemas import (         # met tes Pydantic ici si besoin
     SimpleFileRequest, CustomFileRequest, SaveChunksRequest, SaveChunksResponse, GetChunksByVersionResponse
 )
 from ingestion.document_loader import DocumentLoader
+from ingestion.docs_manager import DocsManager
 from pydantic import BaseModel
 from embedding.embedding_pipeline import EmbeddingPipeline
 
@@ -119,11 +120,13 @@ async def delete_all_series():
 @router.post("/upload-files") # (POST) http://localhost:8050/api/v1/ingestion/upload-files
 async def save_uploaded_files(files: List[UploadFile] = File(...), tags: Optional[str] = None, description: Optional[str] = None):
     try:
-        loader = DocumentLoader()
+        # loader = DocumentLoader()
+        
+        manager = DocsManager()
         for file in files:
             if file.size == 0:
                 return {"error": f"Le fichier {file.filename} est vide."}
-        result = loader.save_uploaded_files(files, tags=tags, description=description)
+        result = manager.save_uploaded_files(files, tags=tags, description=description)
         return result
     except Exception as e:
         return {"error": str(e)}
